@@ -1,0 +1,2443 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>GEN-I</title>
+
+<!--
+    Notice :
+    Cette notice est située ici pour être facilement retrouvable.
+
+
+    LICENSE :
+    Copyright © 2022 Nathan MOHR.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+    IN THE SOFTWARE.
+    
+
+    Rappel des numéros correspondant aux variables de "parametre", le tableau contenant les informations du formulaire :
+    parametre[0] : ht = hauteur du Canvas;
+    parametre[1] : wh = largeur du Canvas;
+    parametre[2] : nb_images = nombre de formes à dessiner;
+    parametre[3] : taille_forme = taille des formes à dessiner;
+    parametre[4] : type_forme = type des formes (aléatoires, régulières ou uniques);
+    parametre[5] : forme_unique = cas forme unique (carré, cercle ou triangle);
+    parametre[6] : trois_couleurs = nombre de couleurs des gradients;
+    parametre[7] : choix_des_couleurs = type des couleurs du gradient (aléatoires, primaires ou choix manuel);
+    parametre[8] : couleur_menu_1 = première couleur du choix manuel;
+    parametre[9] : couleur_menu_2 = deuxième couleur du choix manuel;
+    parametre[10] : couleur_menu_3 = troisième couleur du choix manuel;
+    parametre[11] : couleur_uniforme = si la couleur est la même pour tous les gradients (oui ou non);
+    parametre[12] : direction_gradient = sens du gradient (rose des vents ou aléatoire);
+    parametre[13] : direction_uniforme = si la direction est la même pour tous les gradients (oui ou non);
+
+
+    Définitions :
+    J'utilise plusieurs termes dans mes commentaires et je me souviens plus si je les défini quelque part donc je le fait ici.
+    Page : Canvas dans son état initial. Charger la page web ou cliquer sur le bouton "générer" sont des actions qui génèrent
+        une nouvelle page.
+    Calque : Couche de dessin appliquée sur une page. De base chaque page est générée avec un calque. Un nouveau calque est
+        ajouté à chaque appui sur le bouton "Générer par dessus".
+    Forme : Un carré, un triangle ou un cercle. Le but de ce module est d'en généré le nombre demandé par l'utilisateur sur
+        chaque calque.
+    Case : La zone carré d'une taille indiquée par l'utilisateur qui contient 1 forme.
+    Gradient uni : Si tous les gradients ont les mêmes sens et couleurs, je crée à la place un seul grand canvas que
+        j'applique en fond sur l'ensemble des formes.
+-->
+
+    <!-- Partie css -->
+    <style>
+        .flex{
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .box{
+            flex: 0 1 auto;
+        }
+
+        .menu{
+            flex: 1 0 0;
+        }
+
+        #canvas_board{
+            border: 2px solid #000;
+        }
+
+        #bmode{
+            width: 200px;
+        }
+
+        .non_mode_dev{
+            margin: 0;
+        }
+
+        .msg{
+            color: red;
+            margin: 0;
+        }
+
+        .retour_svg{
+            display: none;
+        }
+    </style>
+
+</head>
+<body>
+
+    <div class="flex">
+        <!-- Partie contenant le Canvas -->
+        <div class="box">
+            <canvas id="canvas_board" width="300" height="300"></canvas>
+        </div>
+
+        <!-- Partie contenant le menu -->
+        <form class="menu">
+            <h1>GEN-I</h1>
+
+            <!--
+                Le mode Normal (celui de base) efface les paramètres les moins pratiques à utiliser
+                Le mode Développeur permet d'accéder à toutes les fonctions
+            -->
+            <button type="button" id="bmode">Passer en mode Développeur</button>
+            <br><br>
+
+            <div class="menu_canvas mode_dev"><!-- ne s'affiche que si "Mode : Développeur" est choisi -->
+                <!-- On peut définir la taille de la zone de dessin -->
+                Dimensions de la zone de dessin :
+                <br>
+                Hauteur :
+                <input type="number" id="ht" name="taille_canvas" min="250" max="1080" value="300" step="10">
+                Largeur :
+                <input type="number" id="wh" name="taille_canvas" min="250" max="1920" value="300" step="10">
+                <br>
+                Valider les nouvelles dimensions ?
+                <button type="button" id="btai">Valider</button>
+                <br>
+                <p class="msg">(/!\ valider efface l'image actuelle /!\)</p>
+                <br>
+            </div>
+
+            <div class="menu_formes">
+                <!-- Le nombre de figures à tracer sur le dessin -->
+                Nombre de formes générées :
+                <input type="number" id="nf" name="nb_formes" min="1" max="4" value="4">
+                <br>
+                <p class="non_mode_dev"><br></p>
+                <div class="mode_dev"><!-- ne s'affiche que si "Mode : Développeur" est choisi -->
+                    <!-- Le message d'alerte est dynamique -->
+                    <p class="msg" id="msg_forme">Vous souhaitez afficher 4 formes. Leur taille maximale est de 150.</p>
+                    (choisir une taille supérieure empêcherait de générer le nombre de formes voulu)
+                    <br><br>
+                    <!-- La taille des figures à tracer sur le dessin -->
+                    Taille des formes générées :
+                    <input type="number" id="tai" name="taille" min="1" max="150" value="150">
+                    <!-- Le message d'alerte est dynamique -->
+                    <p class="msg" id="msg_taille">Vous avez sélectionné une taille de 150. Le nombre maximal de formes générées est de 4.</p>
+                    (choisir un nombre de formes supérieur empêcherait de générer le nombre de formes voulu)
+                    <br><br>
+                </div>
+                Type de formes générées :
+                <br>
+                <!-- Chaque forme est générée au hasard parmi cercle, triangle, rectangle -->
+                <input type="radio" id="t1" name="type_forme" value="random">Aléatoires
+                <!-- Chaque série de 3 blocs contient une de chaque formes -->
+                <input type="radio" id="t2" name="type_forme" value="regulier" checked>Régulières
+                <!-- Toutes les cases générées ont la fomre, selon l'option choisie en-dessous -->
+                <input type="radio" id="t3" name="type_forme" value="unique">Uniques
+                <div class="cond_saisie_unique"><!-- ne s'affiche que si "Type de formes générées : Uniques" est choisi -->
+                    Forme unique :
+                    <input type="radio" id="fu1" name="forme_unique" value="cercle">Cercle
+                    <input type="radio" id="fu2" name="forme_unique" value="triangle">Triangle
+                    <input type="radio" id="fu3" name="forme_unique" value="carre" checked>Carré
+                </div>
+            </div>
+            <br>
+
+            <div class="menu_couleur">
+                <!-- Indique si le gradient est en 2 ou 3 couleurs -->
+                Nombre de couleurs :
+                <input type="radio" id="deux" name="nb_couleurs" value="false" checked>2
+                <input type="radio" id="trois" name="nb_couleurs" value="true">3
+                <br>
+                Choix des couleurs :
+                <br>
+                <!--
+                    Les couleurs sont choisies au hasard parmi toutes les couleurs possibles
+                    Il est possible de tomber 2 fois sur la même
+                -->
+                <input type="radio" id="c1" name="choix_couleurs" value="random">Aléatoires
+                <!--
+                    Les couleurs sont choisies au hasard parmi le jaune, le rouge et le bleu
+                    Il n'est pas possible de tomber 2 fois sur la même couleur
+                -->
+                <input type="radio" id="c2" name="choix_couleurs" value="primaires" checked>Primaires
+                <!-- L'utilisateur choisi ses couleurs via le menu ci-dessous -->
+                <input type="radio" id="c3" name="choix_couleurs" value="manuel">Personnalisées
+                <div class="cond_saisie_manuel"><!-- ne s'affiche que si "Choix des couleurs : Personnalisées" est choisi -->
+                    Couleur #1 :
+                    <input type="color" id="cm1" name="couleur_manuelle" value="#ff8800">
+                    <br>
+                    Couleur #2 :
+                    <input type="color" id="cm2" name="couleur_manuelle" value="#88ff88">
+                    <div class="cond_saisie_trois_couleurs"><!-- ne s'affiche que si "Nombre de couleurs : 3" est choisi -->
+                        Couleur #3 :
+                        <input type="color" id="cm3" name="couleur_manuelle" value="#0088ff">
+                    </div>
+                </div>
+                <br>
+                <div class="cond_saisie_non_manuel"><!-- ne s'affiche que si "Choix des couleurs : Aléatoires" ou "Primaires" est choisi -->
+                    <!-- La même échelle de couleur est-elle appliquée sur tous les gradients ? -->
+                    Appliquer sur toute l'image ?
+                    <input type="radio" id="uni3" name="couleur_unie" value="true">oui
+                    <input type="radio" id="uni4" name="couleur_unie" value="false" checked>non
+                    <br><br>
+                </div>
+            </div>
+
+            <div class="menu_direction">
+                <!-- Direction que suit le gradient -->
+                Sens du gradient :<br>
+                <input type="radio" id="d1" name="direction" value="top">⇑
+                <input type="radio" id="d2" name="direction" value="right top">⇗
+                <input type="radio" id="d3" name="direction" value="right">⇒
+                <input type="radio" id="d4" name="direction" value="right bottom">⇘
+                <input type="radio" id="d5" name="direction" value="bottom">⇓
+                <input type="radio" id="d6" name="direction" value="left bottom">⇙
+                <input type="radio" id="d7" name="direction" value="left">⇐
+                <input type="radio" id="d8" name="direction" value="left top">⇖
+                <input type="radio" id="d9" name="direction" value="random" checked>?
+                <div class="cond_saisie_alea"><!-- ne s'affiche que si "Sens du gradient : ?" est choisi -->
+                    <!-- Applique la même direction à tous les gradients -->
+                    Appliquer sur toute l'image ?
+                    <input type="radio" id="uni1" name="direction_unie" value="true">oui
+                    <input type="radio" id="uni2" name="direction_unie" value="false" checked>non
+                </div>
+            </div>
+            <br>
+
+            <!--
+                Si les paramètres sélectionnés appliquent les mêmes couleurs et
+                direction à tous les gradient, au lieu d'appliquer en boucle le
+                même gradient à chaque forme, le programme crée un seul
+                gradient qui couvre l'ensemble des formes générées de manière
+                unie. La taille de ce gradient s'adapte au nombre de formes
+                pour éviter qu'une partie se perde dans une partie non-dessinée
+                du Canvas.
+            -->
+
+            <div class="menu_bouton">
+                <!-- Génère une nouvelle page avec les paramètres sélectionnés -->
+                <button type="button" id="b1">Générer</button>
+                <!-- Génère un calque au-dessus de la page avec les paramètres sélectionnés -->
+                <button type="button" id="b2">Générer par-dessus</button>
+                <br>
+                <!-- Enregistre le résultat au format png -->
+                <button type="button" id="b3">Enregistrer en .png</button>
+                <button type="button" id="b4" class="mode_dev">Enregistrer en .svg</button>
+                <p class="retour_svg"></p>
+            </div>
+
+        </form>
+
+        <p>
+            <img style="border:0;width:88px;height:31px"
+                src="http://jigsaw.w3.org/css-validator/images/vcss"
+                alt="CSS Valide !" />
+        </p>
+    </div>
+
+
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+
+
+    <script> // script qui gère la sauvegarde du canvas en svg
+        // librairie trouvée sur GitHub : https://github.com/gliffy/canvas2svg/blob/master/canvas2svg.js
+        //Fin dans 1215 lignes-----------------------------------------------------------------------------------------
+        /*!!
+        *  Canvas 2 Svg v1.0.19
+        *  A low level canvas to SVG converter. Uses a mock canvas context to build an SVG document.
+        *
+        *  Licensed under the MIT license:
+        *  http://www.opensource.org/licenses/mit-license.php
+        *
+        *  Author:
+        *  Kerry Liu
+        *
+        *  Copyright (c) 2014 Gliffy Inc.
+        */
+
+        ;(function () {
+            "use strict";
+        
+            var STYLES, ctx, CanvasGradient, CanvasPattern, namedEntities;
+        
+            //helper function to format a string
+            function format(str, args) {
+                var keys = Object.keys(args), i;
+                for (i=0; i<keys.length; i++) {
+                    str = str.replace(new RegExp("\\{" + keys[i] + "\\}", "gi"), args[keys[i]]);
+                }
+                return str;
+            }
+        
+            //helper function that generates a random string
+            function randomString(holder) {
+                var chars, randomstring, i;
+                if (!holder) {
+                    throw new Error("cannot create a random attribute name for an undefined object");
+                }
+                chars = "ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz";
+                randomstring = "";
+                do {
+                    randomstring = "";
+                    for (i = 0; i < 12; i++) {
+                        randomstring += chars[Math.floor(Math.random() * chars.length)];
+                    }
+                } while (holder[randomstring]);
+                return randomstring;
+            }
+        
+            //helper function to map named to numbered entities
+            function createNamedToNumberedLookup(items, radix) {
+                var i, entity, lookup = {}, base10, base16;
+                items = items.split(',');
+                radix = radix || 10;
+                // Map from named to numbered entities.
+                for (i = 0; i < items.length; i += 2) {
+                    entity = '&' + items[i + 1] + ';';
+                    base10 = parseInt(items[i], radix);
+                    lookup[entity] = '&#'+base10+';';
+                }
+                //FF and IE need to create a regex from hex values ie &nbsp; == \xa0
+                lookup["\\xa0"] = '&#160;';
+                return lookup;
+            }
+        
+            //helper function to map canvas-textAlign to svg-textAnchor
+            function getTextAnchor(textAlign) {
+                //TODO: support rtl languages
+                var mapping = {"left":"start", "right":"end", "center":"middle", "start":"start", "end":"end"};
+                return mapping[textAlign] || mapping.start;
+            }
+        
+            //helper function to map canvas-textBaseline to svg-dominantBaseline
+            function getDominantBaseline(textBaseline) {
+                //INFO: not supported in all browsers
+                var mapping = {"alphabetic": "alphabetic", "hanging": "hanging", "top":"text-before-edge", "bottom":"text-after-edge", "middle":"central"};
+                return mapping[textBaseline] || mapping.alphabetic;
+            }
+        
+            // Unpack entities lookup where the numbers are in radix 32 to reduce the size
+            // entity mapping courtesy of tinymce
+            namedEntities = createNamedToNumberedLookup(
+                '50,nbsp,51,iexcl,52,cent,53,pound,54,curren,55,yen,56,brvbar,57,sect,58,uml,59,copy,' +
+                    '5a,ordf,5b,laquo,5c,not,5d,shy,5e,reg,5f,macr,5g,deg,5h,plusmn,5i,sup2,5j,sup3,5k,acute,' +
+                    '5l,micro,5m,para,5n,middot,5o,cedil,5p,sup1,5q,ordm,5r,raquo,5s,frac14,5t,frac12,5u,frac34,' +
+                    '5v,iquest,60,Agrave,61,Aacute,62,Acirc,63,Atilde,64,Auml,65,Aring,66,AElig,67,Ccedil,' +
+                    '68,Egrave,69,Eacute,6a,Ecirc,6b,Euml,6c,Igrave,6d,Iacute,6e,Icirc,6f,Iuml,6g,ETH,6h,Ntilde,' +
+                    '6i,Ograve,6j,Oacute,6k,Ocirc,6l,Otilde,6m,Ouml,6n,times,6o,Oslash,6p,Ugrave,6q,Uacute,' +
+                    '6r,Ucirc,6s,Uuml,6t,Yacute,6u,THORN,6v,szlig,70,agrave,71,aacute,72,acirc,73,atilde,74,auml,' +
+                    '75,aring,76,aelig,77,ccedil,78,egrave,79,eacute,7a,ecirc,7b,euml,7c,igrave,7d,iacute,7e,icirc,' +
+                    '7f,iuml,7g,eth,7h,ntilde,7i,ograve,7j,oacute,7k,ocirc,7l,otilde,7m,ouml,7n,divide,7o,oslash,' +
+                    '7p,ugrave,7q,uacute,7r,ucirc,7s,uuml,7t,yacute,7u,thorn,7v,yuml,ci,fnof,sh,Alpha,si,Beta,' +
+                    'sj,Gamma,sk,Delta,sl,Epsilon,sm,Zeta,sn,Eta,so,Theta,sp,Iota,sq,Kappa,sr,Lambda,ss,Mu,' +
+                    'st,Nu,su,Xi,sv,Omicron,t0,Pi,t1,Rho,t3,Sigma,t4,Tau,t5,Upsilon,t6,Phi,t7,Chi,t8,Psi,' +
+                    't9,Omega,th,alpha,ti,beta,tj,gamma,tk,delta,tl,epsilon,tm,zeta,tn,eta,to,theta,tp,iota,' +
+                    'tq,kappa,tr,lambda,ts,mu,tt,nu,tu,xi,tv,omicron,u0,pi,u1,rho,u2,sigmaf,u3,sigma,u4,tau,' +
+                    'u5,upsilon,u6,phi,u7,chi,u8,psi,u9,omega,uh,thetasym,ui,upsih,um,piv,812,bull,816,hellip,' +
+                    '81i,prime,81j,Prime,81u,oline,824,frasl,88o,weierp,88h,image,88s,real,892,trade,89l,alefsym,' +
+                    '8cg,larr,8ch,uarr,8ci,rarr,8cj,darr,8ck,harr,8dl,crarr,8eg,lArr,8eh,uArr,8ei,rArr,8ej,dArr,' +
+                    '8ek,hArr,8g0,forall,8g2,part,8g3,exist,8g5,empty,8g7,nabla,8g8,isin,8g9,notin,8gb,ni,8gf,prod,' +
+                    '8gh,sum,8gi,minus,8gn,lowast,8gq,radic,8gt,prop,8gu,infin,8h0,ang,8h7,and,8h8,or,8h9,cap,8ha,cup,' +
+                    '8hb,int,8hk,there4,8hs,sim,8i5,cong,8i8,asymp,8j0,ne,8j1,equiv,8j4,le,8j5,ge,8k2,sub,8k3,sup,8k4,' +
+                    'nsub,8k6,sube,8k7,supe,8kl,oplus,8kn,otimes,8l5,perp,8m5,sdot,8o8,lceil,8o9,rceil,8oa,lfloor,8ob,' +
+                    'rfloor,8p9,lang,8pa,rang,9ea,loz,9j0,spades,9j3,clubs,9j5,hearts,9j6,diams,ai,OElig,aj,oelig,b0,' +
+                    'Scaron,b1,scaron,bo,Yuml,m6,circ,ms,tilde,802,ensp,803,emsp,809,thinsp,80c,zwnj,80d,zwj,80e,lrm,' +
+                    '80f,rlm,80j,ndash,80k,mdash,80o,lsquo,80p,rsquo,80q,sbquo,80s,ldquo,80t,rdquo,80u,bdquo,810,dagger,' +
+                    '811,Dagger,81g,permil,81p,lsaquo,81q,rsaquo,85c,euro', 32);
+        
+        
+            //Some basic mappings for attributes and default values.
+            STYLES = {
+                "strokeStyle":{
+                    svgAttr : "stroke", //corresponding svg attribute
+                    canvas : "#000000", //canvas default
+                    svg : "none",       //svg default
+                    apply : "stroke"    //apply on stroke() or fill()
+                },
+                "fillStyle":{
+                    svgAttr : "fill",
+                    canvas : "#000000",
+                    svg : null, //svg default is black, but we need to special case this to handle canvas stroke without fill
+                    apply : "fill"
+                },
+                "lineCap":{
+                    svgAttr : "stroke-linecap",
+                    canvas : "butt",
+                    svg : "butt",
+                    apply : "stroke"
+                },
+                "lineJoin":{
+                    svgAttr : "stroke-linejoin",
+                    canvas : "miter",
+                    svg : "miter",
+                    apply : "stroke"
+                },
+                "miterLimit":{
+                    svgAttr : "stroke-miterlimit",
+                    canvas : 10,
+                    svg : 4,
+                    apply : "stroke"
+                },
+                "lineWidth":{
+                    svgAttr : "stroke-width",
+                    canvas : 1,
+                    svg : 1,
+                    apply : "stroke"
+                },
+                "globalAlpha": {
+                    svgAttr : "opacity",
+                    canvas : 1,
+                    svg : 1,
+                    apply :  "fill stroke"
+                },
+                "font":{
+                    //font converts to multiple svg attributes, there is custom logic for this
+                    canvas : "10px sans-serif"
+                },
+                "shadowColor":{
+                    canvas : "#000000"
+                },
+                "shadowOffsetX":{
+                    canvas : 0
+                },
+                "shadowOffsetY":{
+                    canvas : 0
+                },
+                "shadowBlur":{
+                    canvas : 0
+                },
+                "textAlign":{
+                    canvas : "start"
+                },
+                "textBaseline":{
+                    canvas : "alphabetic"
+                },
+                "lineDash" : {
+                    svgAttr : "stroke-dasharray",
+                    canvas : [],
+                    svg : null,
+                    apply : "stroke"
+                }
+            };
+        
+            /**
+            *
+            * @param gradientNode - reference to the gradient
+            * @constructor
+            */
+            CanvasGradient = function (gradientNode, ctx) {
+                this.__root = gradientNode;
+                this.__ctx = ctx;
+            };
+        
+            /**
+            * Adds a color stop to the gradient root
+            */
+            CanvasGradient.prototype.addColorStop = function (offset, color) {
+                var stop = this.__ctx.__createElement("stop"), regex, matches;
+                stop.setAttribute("offset", offset);
+                if (color.indexOf("rgba") !== -1) {
+                    //separate alpha value, since webkit can't handle it
+                    regex = /rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d?\.?\d*)\s*\)/gi;
+                    matches = regex.exec(color);
+                    stop.setAttribute("stop-color", format("rgb({r},{g},{b})", {r:matches[1], g:matches[2], b:matches[3]}));
+                    stop.setAttribute("stop-opacity", matches[4]);
+                } else {
+                    stop.setAttribute("stop-color", color);
+                }
+                this.__root.appendChild(stop);
+            };
+        
+            CanvasPattern = function (pattern, ctx) {
+                this.__root = pattern;
+                this.__ctx = ctx;
+            };
+        
+            /**
+            * The mock canvas context
+            * @param o - options include:
+            * ctx - existing Context2D to wrap around
+            * width - width of your canvas (defaults to 500)
+            * height - height of your canvas (defaults to 500)
+            * enableMirroring - enables canvas mirroring (get image data) (defaults to false)
+            * document - the document object (defaults to the current document)
+            */
+            ctx = function (o) {
+                var defaultOptions = { width:500, height:500, enableMirroring : false}, options;
+        
+                //keep support for this way of calling C2S: new C2S(width,height)
+                if (arguments.length > 1) {
+                    options = defaultOptions;
+                    options.width = arguments[0];
+                    options.height = arguments[1];
+                } else if ( !o ) {
+                    options = defaultOptions;
+                } else {
+                    options = o;
+                }
+        
+                if (!(this instanceof ctx)) {
+                    //did someone call this without new?
+                    return new ctx(options);
+                }
+        
+                //setup options
+                this.width = options.width || defaultOptions.width;
+                this.height = options.height || defaultOptions.height;
+                this.enableMirroring = options.enableMirroring !== undefined ? options.enableMirroring : defaultOptions.enableMirroring;
+        
+                this.canvas = this;   ///point back to this instance!
+                this.__document = options.document || document;
+        
+                // allow passing in an existing context to wrap around
+                // if a context is passed in, we know a canvas already exist
+                if (options.ctx) {
+                    this.__ctx = options.ctx;
+                } else {
+                    this.__canvas = this.__document.createElement("canvas");
+                    this.__ctx = this.__canvas.getContext("2d");
+                }
+        
+                this.__setDefaultStyles();
+                this.__stack = [this.__getStyleState()];
+                this.__groupStack = [];
+        
+                //the root svg element
+                this.__root = this.__document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                this.__root.setAttribute("version", 1.1);
+                this.__root.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                this.__root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xlink", "http://www.w3.org/1999/xlink");
+                this.__root.setAttribute("width", this.width);
+                this.__root.setAttribute("height", this.height);
+        
+                //make sure we don't generate the same ids in defs
+                this.__ids = {};
+        
+                //defs tag
+                this.__defs = this.__document.createElementNS("http://www.w3.org/2000/svg", "defs");
+                this.__root.appendChild(this.__defs);
+        
+                //also add a group child. the svg element can't use the transform attribute
+                this.__currentElement = this.__document.createElementNS("http://www.w3.org/2000/svg", "g");
+                this.__root.appendChild(this.__currentElement);
+            };
+        
+        
+            /**
+            * Creates the specified svg element
+            * @private
+            */
+            ctx.prototype.__createElement = function (elementName, properties, resetFill) {
+                if (typeof properties === "undefined") {
+                    properties = {};
+                }
+        
+                var element = this.__document.createElementNS("http://www.w3.org/2000/svg", elementName),
+                    keys = Object.keys(properties), i, key;
+                if (resetFill) {
+                    //if fill or stroke is not specified, the svg element should not display. By default SVG's fill is black.
+                    element.setAttribute("fill", "none");
+                    element.setAttribute("stroke", "none");
+                }
+                for (i=0; i<keys.length; i++) {
+                    key = keys[i];
+                    element.setAttribute(key, properties[key]);
+                }
+                return element;
+            };
+        
+            /**
+            * Applies default canvas styles to the context
+            * @private
+            */
+            ctx.prototype.__setDefaultStyles = function () {
+                //default 2d canvas context properties see:http://www.w3.org/TR/2dcontext/
+                var keys = Object.keys(STYLES), i, key;
+                for (i=0; i<keys.length; i++) {
+                    key = keys[i];
+                    this[key] = STYLES[key].canvas;
+                }
+            };
+        
+            /**
+            * Applies styles on restore
+            * @param styleState
+            * @private
+            */
+            ctx.prototype.__applyStyleState = function (styleState) {
+                var keys = Object.keys(styleState), i, key;
+                for (i=0; i<keys.length; i++) {
+                    key = keys[i];
+                    this[key] = styleState[key];
+                }
+            };
+        
+            /**
+            * Gets the current style state
+            * @return {Object}
+            * @private
+            */
+            ctx.prototype.__getStyleState = function () {
+                var i, styleState = {}, keys = Object.keys(STYLES), key;
+                for (i=0; i<keys.length; i++) {
+                    key = keys[i];
+                    styleState[key] = this[key];
+                }
+                return styleState;
+            };
+        
+            /**
+            * Apples the current styles to the current SVG element. On "ctx.fill" or "ctx.stroke"
+            * @param type
+            * @private
+            */
+            ctx.prototype.__applyStyleToCurrentElement = function (type) {
+            var currentElement = this.__currentElement;
+            var currentStyleGroup = this.__currentElementsToStyle;
+            if (currentStyleGroup) {
+                currentElement.setAttribute(type, "");
+                currentElement = currentStyleGroup.element;
+                currentStyleGroup.children.forEach(function (node) {
+                node.setAttribute(type, "");
+                })
+            }
+        
+                var keys = Object.keys(STYLES), i, style, value, id, regex, matches;
+                for (i = 0; i < keys.length; i++) {
+                    style = STYLES[keys[i]];
+                    value = this[keys[i]];
+                    if (style.apply) {
+                        //is this a gradient or pattern?
+                        if (value instanceof CanvasPattern) {
+                            //pattern
+                            if (value.__ctx) {
+                                //copy over defs
+                                while(value.__ctx.__defs.childNodes.length) {
+                                    id = value.__ctx.__defs.childNodes[0].getAttribute("id");
+                                    this.__ids[id] = id;
+                                    this.__defs.appendChild(value.__ctx.__defs.childNodes[0]);
+                                }
+                            }
+                            currentElement.setAttribute(style.apply, format("url(#{id})", {id:value.__root.getAttribute("id")}));
+                        }
+                        else if (value instanceof CanvasGradient) {
+                            //gradient
+                            currentElement.setAttribute(style.apply, format("url(#{id})", {id:value.__root.getAttribute("id")}));
+                        } else if (style.apply.indexOf(type)!==-1 && style.svg !== value) {
+                            if ((style.svgAttr === "stroke" || style.svgAttr === "fill") && value.indexOf("rgba") !== -1) {
+                                //separate alpha value, since illustrator can't handle it
+                                regex = /rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d?\.?\d*)\s*\)/gi;
+                                matches = regex.exec(value);
+                                currentElement.setAttribute(style.svgAttr, format("rgb({r},{g},{b})", {r:matches[1], g:matches[2], b:matches[3]}));
+                                //should take globalAlpha here
+                                var opacity = matches[4];
+                                var globalAlpha = this.globalAlpha;
+                                if (globalAlpha != null) {
+                                    opacity *= globalAlpha;
+                                }
+                                currentElement.setAttribute(style.svgAttr+"-opacity", opacity);
+                            } else {
+                                var attr = style.svgAttr;
+                                if (keys[i] === 'globalAlpha') {
+                                    attr = type+'-'+style.svgAttr;
+                                    if (currentElement.getAttribute(attr)) {
+                                        //fill-opacity or stroke-opacity has already been set by stroke or fill.
+                                        continue;
+                                    }
+                                }
+                                //otherwise only update attribute if right type, and not svg default
+                                currentElement.setAttribute(attr, value);
+                            }
+                        }
+                    }
+                }
+            };
+        
+            /**
+            * Will return the closest group or svg node. May return the current element.
+            * @private
+            */
+            ctx.prototype.__closestGroupOrSvg = function (node) {
+                node = node || this.__currentElement;
+                if (node.nodeName === "g" || node.nodeName === "svg") {
+                    return node;
+                } else {
+                    return this.__closestGroupOrSvg(node.parentNode);
+                }
+            };
+        
+            /**
+            * Returns the serialized value of the svg so far
+            * @param fixNamedEntities - Standalone SVG doesn't support named entities, which document.createTextNode encodes.
+            *                           If true, we attempt to find all named entities and encode it as a numeric entity.
+            * @return serialized svg
+            */
+            ctx.prototype.getSerializedSvg = function (fixNamedEntities) {
+                var serialized = new XMLSerializer().serializeToString(this.__root),
+                    keys, i, key, value, regexp, xmlns;
+        
+                //IE search for a duplicate xmnls because they didn't implement setAttributeNS correctly
+                xmlns = /xmlns="http:\/\/www\.w3\.org\/2000\/svg".+xmlns="http:\/\/www\.w3\.org\/2000\/svg/gi;
+                if (xmlns.test(serialized)) {
+                    serialized = serialized.replace('xmlns="http://www.w3.org/2000/svg','xmlns:xlink="http://www.w3.org/1999/xlink');
+                }
+        
+                if (fixNamedEntities) {
+                    keys = Object.keys(namedEntities);
+                    //loop over each named entity and replace with the proper equivalent.
+                    for (i=0; i<keys.length; i++) {
+                        key = keys[i];
+                        value = namedEntities[key];
+                        regexp = new RegExp(key, "gi");
+                        if (regexp.test(serialized)) {
+                            serialized = serialized.replace(regexp, value);
+                        }
+                    }
+                }
+        
+                return serialized;
+            };
+        
+        
+            /**
+            * Returns the root svg
+            * @return
+            */
+            ctx.prototype.getSvg = function () {
+                return this.__root;
+            };
+            /**
+            * Will generate a group tag.
+            */
+            ctx.prototype.save = function () {
+                var group = this.__createElement("g");
+                var parent = this.__closestGroupOrSvg();
+                this.__groupStack.push(parent);
+                parent.appendChild(group);
+                this.__currentElement = group;
+                this.__stack.push(this.__getStyleState());
+            };
+            /**
+            * Sets current element to parent, or just root if already root
+            */
+            ctx.prototype.restore = function () {
+                this.__currentElement = this.__groupStack.pop();
+                this.__currentElementsToStyle = null;
+                //Clearing canvas will make the poped group invalid, currentElement is set to the root group node.
+                if (!this.__currentElement) {
+                    this.__currentElement = this.__root.childNodes[1];
+                }
+                var state = this.__stack.pop();
+                this.__applyStyleState(state);
+            };
+        
+            /**
+            * Helper method to add transform
+            * @private
+            */
+            ctx.prototype.__addTransform = function (t) {
+                //if the current element has siblings, add another group
+                var parent = this.__closestGroupOrSvg();
+                if (parent.childNodes.length > 0) {
+                if (this.__currentElement.nodeName === "path") {
+                    if (!this.__currentElementsToStyle) {this.__currentElementsToStyle = {element: parent, children: []}};
+                    this.__currentElementsToStyle.children.push(this.__currentElement)
+                    this.__applyCurrentDefaultPath();
+                }
+        
+                    var group = this.__createElement("g");
+                    parent.appendChild(group);
+                    this.__currentElement = group;
+                }
+        
+                var transform = this.__currentElement.getAttribute("transform");
+                if (transform) {
+                    transform += " ";
+                } else {
+                    transform = "";
+                }
+                transform += t;
+                this.__currentElement.setAttribute("transform", transform);
+            };
+        
+            /**
+            *  scales the current element
+            */
+            ctx.prototype.scale = function (x, y) {
+                if (y === undefined) {
+                    y = x;
+                }
+                this.__addTransform(format("scale({x},{y})", {x:x, y:y}));
+            };
+        
+            /**
+            * rotates the current element
+            */
+            ctx.prototype.rotate = function (angle) {
+                var degrees = (angle * 180 / Math.PI);
+                this.__addTransform(format("rotate({angle},{cx},{cy})", {angle:degrees, cx:0, cy:0}));
+            };
+        
+            /**
+            * translates the current element
+            */
+            ctx.prototype.translate = function (x, y) {
+                this.__addTransform(format("translate({x},{y})", {x:x,y:y}));
+            };
+        
+            /**
+            * applies a transform to the current element
+            */
+            ctx.prototype.transform = function (a, b, c, d, e, f) {
+                this.__addTransform(format("matrix({a},{b},{c},{d},{e},{f})", {a:a, b:b, c:c, d:d, e:e, f:f}));
+            };
+        
+            /**
+            * Create a new Path Element
+            */
+            ctx.prototype.beginPath = function () {
+                var path, parent;
+        
+                // Note that there is only one current default path, it is not part of the drawing state.
+                // See also: https://html.spec.whatwg.org/multipage/scripting.html#current-default-path
+                this.__currentDefaultPath = "";
+                this.__currentPosition = {};
+        
+                path = this.__createElement("path", {}, true);
+                parent = this.__closestGroupOrSvg();
+                parent.appendChild(path);
+                this.__currentElement = path;
+            };
+        
+            /**
+            * Helper function to apply currentDefaultPath to current path element
+            * @private
+            */
+            ctx.prototype.__applyCurrentDefaultPath = function () {
+            var currentElement = this.__currentElement;
+                if (currentElement.nodeName === "path") {
+            currentElement.setAttribute("d", this.__currentDefaultPath);
+                } else {
+            console.error("Attempted to apply path command to node", currentElement.nodeName);
+                }
+            };
+        
+            /**
+            * Helper function to add path command
+            * @private
+            */
+            ctx.prototype.__addPathCommand = function (command) {
+                this.__currentDefaultPath += " ";
+                this.__currentDefaultPath += command;
+            };
+        
+            /**
+            * Adds the move command to the current path element,
+            * if the currentPathElement is not empty create a new path element
+            */
+            ctx.prototype.moveTo = function (x,y) {
+                if (this.__currentElement.nodeName !== "path") {
+                    this.beginPath();
+                }
+        
+                // creates a new subpath with the given point
+                this.__currentPosition = {x: x, y: y};
+                this.__addPathCommand(format("M {x} {y}", {x:x, y:y}));
+            };
+        
+            /**
+            * Closes the current path
+            */
+            ctx.prototype.closePath = function () {
+                if (this.__currentDefaultPath) {
+                    this.__addPathCommand("Z");
+                }
+            };
+        
+            /**
+            * Adds a line to command
+            */
+            ctx.prototype.lineTo = function (x, y) {
+                this.__currentPosition = {x: x, y: y};
+                if (this.__currentDefaultPath.indexOf('M') > -1) {
+                    this.__addPathCommand(format("L {x} {y}", {x:x, y:y}));
+                } else {
+                    this.__addPathCommand(format("M {x} {y}", {x:x, y:y}));
+                }
+            };
+        
+            /**
+            * Add a bezier command
+            */
+            ctx.prototype.bezierCurveTo = function (cp1x, cp1y, cp2x, cp2y, x, y) {
+                this.__currentPosition = {x: x, y: y};
+                this.__addPathCommand(format("C {cp1x} {cp1y} {cp2x} {cp2y} {x} {y}",
+                    {cp1x:cp1x, cp1y:cp1y, cp2x:cp2x, cp2y:cp2y, x:x, y:y}));
+            };
+        
+            /**
+            * Adds a quadratic curve to command
+            */
+            ctx.prototype.quadraticCurveTo = function (cpx, cpy, x, y) {
+                this.__currentPosition = {x: x, y: y};
+                this.__addPathCommand(format("Q {cpx} {cpy} {x} {y}", {cpx:cpx, cpy:cpy, x:x, y:y}));
+            };
+        
+        
+            /**
+            * Return a new normalized vector of given vector
+            */
+            var normalize = function (vector) {
+                var len = Math.sqrt(vector[0] * vector[0] + vector[1] * vector[1]);
+                return [vector[0] / len, vector[1] / len];
+            };
+        
+            /**
+            * Adds the arcTo to the current path
+            *
+            * @see http://www.w3.org/TR/2015/WD-2dcontext-20150514/#dom-context-2d-arcto
+            */
+            ctx.prototype.arcTo = function (x1, y1, x2, y2, radius) {
+                // Let the point (x0, y0) be the last point in the subpath.
+                var x0 = this.__currentPosition && this.__currentPosition.x;
+                var y0 = this.__currentPosition && this.__currentPosition.y;
+        
+                // First ensure there is a subpath for (x1, y1).
+                if (typeof x0 == "undefined" || typeof y0 == "undefined") {
+                    return;
+                }
+        
+                // Negative values for radius must cause the implementation to throw an IndexSizeError exception.
+                if (radius < 0) {
+                    throw new Error("IndexSizeError: The radius provided (" + radius + ") is negative.");
+                }
+        
+                // If the point (x0, y0) is equal to the point (x1, y1),
+                // or if the point (x1, y1) is equal to the point (x2, y2),
+                // or if the radius radius is zero,
+                // then the method must add the point (x1, y1) to the subpath,
+                // and connect that point to the previous point (x0, y0) by a straight line.
+                if (((x0 === x1) && (y0 === y1))
+                    || ((x1 === x2) && (y1 === y2))
+                    || (radius === 0)) {
+                    this.lineTo(x1, y1);
+                    return;
+                }
+        
+                // Otherwise, if the points (x0, y0), (x1, y1), and (x2, y2) all lie on a single straight line,
+                // then the method must add the point (x1, y1) to the subpath,
+                // and connect that point to the previous point (x0, y0) by a straight line.
+                var unit_vec_p1_p0 = normalize([x0 - x1, y0 - y1]);
+                var unit_vec_p1_p2 = normalize([x2 - x1, y2 - y1]);
+                if (unit_vec_p1_p0[0] * unit_vec_p1_p2[1] === unit_vec_p1_p0[1] * unit_vec_p1_p2[0]) {
+                    this.lineTo(x1, y1);
+                    return;
+                }
+        
+                // Otherwise, let The Arc be the shortest arc given by circumference of the circle that has radius radius,
+                // and that has one point tangent to the half-infinite line that crosses the point (x0, y0) and ends at the point (x1, y1),
+                // and that has a different point tangent to the half-infinite line that ends at the point (x1, y1), and crosses the point (x2, y2).
+                // The points at which this circle touches these two lines are called the start and end tangent points respectively.
+        
+                // note that both vectors are unit vectors, so the length is 1
+                var cos = (unit_vec_p1_p0[0] * unit_vec_p1_p2[0] + unit_vec_p1_p0[1] * unit_vec_p1_p2[1]);
+                var theta = Math.acos(Math.abs(cos));
+        
+                // Calculate origin
+                var unit_vec_p1_origin = normalize([
+                    unit_vec_p1_p0[0] + unit_vec_p1_p2[0],
+                    unit_vec_p1_p0[1] + unit_vec_p1_p2[1]
+                ]);
+                var len_p1_origin = radius / Math.sin(theta / 2);
+                var x = x1 + len_p1_origin * unit_vec_p1_origin[0];
+                var y = y1 + len_p1_origin * unit_vec_p1_origin[1];
+        
+                // Calculate start angle and end angle
+                // rotate 90deg clockwise (note that y axis points to its down)
+                var unit_vec_origin_start_tangent = [
+                    -unit_vec_p1_p0[1],
+                    unit_vec_p1_p0[0]
+                ];
+                // rotate 90deg counter clockwise (note that y axis points to its down)
+                var unit_vec_origin_end_tangent = [
+                    unit_vec_p1_p2[1],
+                    -unit_vec_p1_p2[0]
+                ];
+                var getAngle = function (vector) {
+                    // get angle (clockwise) between vector and (1, 0)
+                    var x = vector[0];
+                    var y = vector[1];
+                    if (y >= 0) { // note that y axis points to its down
+                        return Math.acos(x);
+                    } else {
+                        return -Math.acos(x);
+                    }
+                };
+                var startAngle = getAngle(unit_vec_origin_start_tangent);
+                var endAngle = getAngle(unit_vec_origin_end_tangent);
+        
+                // Connect the point (x0, y0) to the start tangent point by a straight line
+                this.lineTo(x + unit_vec_origin_start_tangent[0] * radius,
+                            y + unit_vec_origin_start_tangent[1] * radius);
+        
+                // Connect the start tangent point to the end tangent point by arc
+                // and adding the end tangent point to the subpath.
+                this.arc(x, y, radius, startAngle, endAngle);
+            };
+        
+            /**
+            * Sets the stroke property on the current element
+            */
+            ctx.prototype.stroke = function () {
+                if (this.__currentElement.nodeName === "path") {
+                    this.__currentElement.setAttribute("paint-order", "fill stroke markers");
+                }
+                this.__applyCurrentDefaultPath();
+                this.__applyStyleToCurrentElement("stroke");
+            };
+        
+            /**
+            * Sets fill properties on the current element
+            */
+            ctx.prototype.fill = function () {
+                if (this.__currentElement.nodeName === "path") {
+                    this.__currentElement.setAttribute("paint-order", "stroke fill markers");
+                }
+                this.__applyCurrentDefaultPath();
+                this.__applyStyleToCurrentElement("fill");
+            };
+        
+            /**
+            *  Adds a rectangle to the path.
+            */
+            ctx.prototype.rect = function (x, y, width, height) {
+                if (this.__currentElement.nodeName !== "path") {
+                    this.beginPath();
+                }
+                this.moveTo(x, y);
+                this.lineTo(x+width, y);
+                this.lineTo(x+width, y+height);
+                this.lineTo(x, y+height);
+                this.lineTo(x, y);
+                this.closePath();
+            };
+        
+        
+            /**
+            * adds a rectangle element
+            */
+            ctx.prototype.fillRect = function (x, y, width, height) {
+                var rect, parent;
+                rect = this.__createElement("rect", {
+                    x : x,
+                    y : y,
+                    width : width,
+                    height : height
+                }, true);
+                parent = this.__closestGroupOrSvg();
+                parent.appendChild(rect);
+                this.__currentElement = rect;
+                this.__applyStyleToCurrentElement("fill");
+            };
+        
+            /**
+            * Draws a rectangle with no fill
+            * @param x
+            * @param y
+            * @param width
+            * @param height
+            */
+            ctx.prototype.strokeRect = function (x, y, width, height) {
+                var rect, parent;
+                rect = this.__createElement("rect", {
+                    x : x,
+                    y : y,
+                    width : width,
+                    height : height
+                }, true);
+                parent = this.__closestGroupOrSvg();
+                parent.appendChild(rect);
+                this.__currentElement = rect;
+                this.__applyStyleToCurrentElement("stroke");
+            };
+        
+        
+            /**
+            * Clear entire canvas:
+            * 1. save current transforms
+            * 2. remove all the childNodes of the root g element
+            */
+            ctx.prototype.__clearCanvas = function () {
+                var current = this.__closestGroupOrSvg(),
+                    transform = current.getAttribute("transform");
+                var rootGroup = this.__root.childNodes[1];
+                var childNodes = rootGroup.childNodes;
+                var i;
+                for (i = childNodes.length - 1; i >= 0; i--) {
+                    if (childNodes[i]) {
+                        rootGroup.removeChild(childNodes[i]);
+                    }
+                }
+                this.__currentElement = rootGroup;
+                //reset __groupStack as all the child group nodes are all removed.
+                this.__groupStack = [];
+                if (transform) {
+                    this.__addTransform(transform);
+                }
+            };
+        
+            /**
+            * "Clears" a canvas by just drawing a white rectangle in the current group.
+            */
+            ctx.prototype.clearRect = function (x, y, width, height) {
+                //clear entire canvas
+                if (x === 0 && y === 0 && width === this.width && height === this.height) {
+                    this.__clearCanvas();
+                    return;
+                }
+                var rect, parent = this.__closestGroupOrSvg();
+                rect = this.__createElement("rect", {
+                    x : x,
+                    y : y,
+                    width : width,
+                    height : height,
+                    fill : "#FFFFFF"
+                }, true);
+                parent.appendChild(rect);
+            };
+        
+            /**
+            * Adds a linear gradient to a defs tag.
+            * Returns a canvas gradient object that has a reference to it's parent def
+            */
+            ctx.prototype.createLinearGradient = function (x1, y1, x2, y2) {
+                var grad = this.__createElement("linearGradient", {
+                    id : randomString(this.__ids),
+                    x1 : x1+"px",
+                    x2 : x2+"px",
+                    y1 : y1+"px",
+                    y2 : y2+"px",
+                    "gradientUnits" : "userSpaceOnUse"
+                }, false);
+                this.__defs.appendChild(grad);
+                return new CanvasGradient(grad, this);
+            };
+        
+            /**
+            * Adds a radial gradient to a defs tag.
+            * Returns a canvas gradient object that has a reference to it's parent def
+            */
+            ctx.prototype.createRadialGradient = function (x0, y0, r0, x1, y1, r1) {
+                var grad = this.__createElement("radialGradient", {
+                    id : randomString(this.__ids),
+                    cx : x1+"px",
+                    cy : y1+"px",
+                    r  : r1+"px",
+                    fx : x0+"px",
+                    fy : y0+"px",
+                    "gradientUnits" : "userSpaceOnUse"
+                }, false);
+                this.__defs.appendChild(grad);
+                return new CanvasGradient(grad, this);
+        
+            };
+        
+            /**
+            * Parses the font string and returns svg mapping
+            * @private
+            */
+            ctx.prototype.__parseFont = function () {
+                var regex = /^\s*(?=(?:(?:[-a-z]+\s*){0,2}(italic|oblique))?)(?=(?:(?:[-a-z]+\s*){0,2}(small-caps))?)(?=(?:(?:[-a-z]+\s*){0,2}(bold(?:er)?|lighter|[1-9]00))?)(?:(?:normal|\1|\2|\3)\s*){0,3}((?:xx?-)?(?:small|large)|medium|smaller|larger|[.\d]+(?:\%|in|[cem]m|ex|p[ctx]))(?:\s*\/\s*(normal|[.\d]+(?:\%|in|[cem]m|ex|p[ctx])))?\s*([-,\'\"\sa-z0-9]+?)\s*$/i;
+                var fontPart = regex.exec( this.font );
+                var data = {
+                    style : fontPart[1] || 'normal',
+                    size : fontPart[4] || '10px',
+                    family : fontPart[6] || 'sans-serif',
+                    weight: fontPart[3] || 'normal',
+                    decoration : fontPart[2] || 'normal',
+                    href : null
+                };
+        
+                //canvas doesn't support underline natively, but we can pass this attribute
+                if (this.__fontUnderline === "underline") {
+                    data.decoration = "underline";
+                }
+        
+                //canvas also doesn't support linking, but we can pass this as well
+                if (this.__fontHref) {
+                    data.href = this.__fontHref;
+                }
+        
+                return data;
+            };
+        
+            /**
+            * Helper to link text fragments
+            * @param font
+            * @param element
+            * @return {*}
+            * @private
+            */
+            ctx.prototype.__wrapTextLink = function (font, element) {
+                if (font.href) {
+                    var a = this.__createElement("a");
+                    a.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", font.href);
+                    a.appendChild(element);
+                    return a;
+                }
+                return element;
+            };
+        
+            /**
+            * Fills or strokes text
+            * @param text
+            * @param x
+            * @param y
+            * @param action - stroke or fill
+            * @private
+            */
+            ctx.prototype.__applyText = function (text, x, y, action) {
+                var font = this.__parseFont(),
+                    parent = this.__closestGroupOrSvg(),
+                    textElement = this.__createElement("text", {
+                        "font-family" : font.family,
+                        "font-size" : font.size,
+                        "font-style" : font.style,
+                        "font-weight" : font.weight,
+                        "text-decoration" : font.decoration,
+                        "x" : x,
+                        "y" : y,
+                        "text-anchor": getTextAnchor(this.textAlign),
+                        "dominant-baseline": getDominantBaseline(this.textBaseline)
+                    }, true);
+        
+                textElement.appendChild(this.__document.createTextNode(text));
+                this.__currentElement = textElement;
+                this.__applyStyleToCurrentElement(action);
+                parent.appendChild(this.__wrapTextLink(font,textElement));
+            };
+        
+            /**
+            * Creates a text element
+            * @param text
+            * @param x
+            * @param y
+            */
+            ctx.prototype.fillText = function (text, x, y) {
+                this.__applyText(text, x, y, "fill");
+            };
+        
+            /**
+            * Strokes text
+            * @param text
+            * @param x
+            * @param y
+            */
+            ctx.prototype.strokeText = function (text, x, y) {
+                this.__applyText(text, x, y, "stroke");
+            };
+        
+            /**
+            * No need to implement this for svg.
+            * @param text
+            * @return {TextMetrics}
+            */
+            ctx.prototype.measureText = function (text) {
+                this.__ctx.font = this.font;
+                return this.__ctx.measureText(text);
+            };
+        
+            /**
+            *  Arc command!
+            */
+            ctx.prototype.arc = function (x, y, radius, startAngle, endAngle, counterClockwise) {
+                // in canvas no circle is drawn if no angle is provided.
+                if (startAngle === endAngle) {
+                    return;
+                }
+                startAngle = startAngle % (2*Math.PI);
+                endAngle = endAngle % (2*Math.PI);
+                if (startAngle === endAngle) {
+                    //circle time! subtract some of the angle so svg is happy (svg elliptical arc can't draw a full circle)
+                    endAngle = ((endAngle + (2*Math.PI)) - 0.001 * (counterClockwise ? -1 : 1)) % (2*Math.PI);
+                }
+                var endX = x+radius*Math.cos(endAngle),
+                    endY = y+radius*Math.sin(endAngle),
+                    startX = x+radius*Math.cos(startAngle),
+                    startY = y+radius*Math.sin(startAngle),
+                    sweepFlag = counterClockwise ? 0 : 1,
+                    largeArcFlag = 0,
+                    diff = endAngle - startAngle;
+        
+                // https://github.com/gliffy/canvas2svg/issues/4
+                if (diff < 0) {
+                    diff += 2*Math.PI;
+                }
+        
+                if (counterClockwise) {
+                    largeArcFlag = diff > Math.PI ? 0 : 1;
+                } else {
+                    largeArcFlag = diff > Math.PI ? 1 : 0;
+                }
+        
+                this.lineTo(startX, startY);
+                this.__addPathCommand(format("A {rx} {ry} {xAxisRotation} {largeArcFlag} {sweepFlag} {endX} {endY}",
+                    {rx:radius, ry:radius, xAxisRotation:0, largeArcFlag:largeArcFlag, sweepFlag:sweepFlag, endX:endX, endY:endY}));
+        
+                this.__currentPosition = {x: endX, y: endY};
+            };
+        
+            /**
+            * Generates a ClipPath from the clip command.
+            */
+            ctx.prototype.clip = function () {
+                var group = this.__closestGroupOrSvg(),
+                    clipPath = this.__createElement("clipPath"),
+                    id =  randomString(this.__ids),
+                    newGroup = this.__createElement("g");
+        
+                this.__applyCurrentDefaultPath();
+                group.removeChild(this.__currentElement);
+                clipPath.setAttribute("id", id);
+                clipPath.appendChild(this.__currentElement);
+        
+                this.__defs.appendChild(clipPath);
+        
+                //set the clip path to this group
+                group.setAttribute("clip-path", format("url(#{id})", {id:id}));
+        
+                //clip paths can be scaled and transformed, we need to add another wrapper group to avoid later transformations
+                // to this path
+                group.appendChild(newGroup);
+        
+                this.__currentElement = newGroup;
+        
+            };
+        
+            /**
+            * Draws a canvas, image or mock context to this canvas.
+            * Note that all svg dom manipulation uses node.childNodes rather than node.children for IE support.
+            * http://www.whatwg.org/specs/web-apps/current-work/multipage/the-canvas-element.html#dom-context-2d-drawimage
+            */
+            ctx.prototype.drawImage = function () {
+                //convert arguments to a real array
+                var args = Array.prototype.slice.call(arguments),
+                    image=args[0],
+                    dx, dy, dw, dh, sx=0, sy=0, sw, sh, parent, svg, defs, group,
+                    currentElement, svgImage, canvas, context, id;
+        
+                if (args.length === 3) {
+                    dx = args[1];
+                    dy = args[2];
+                    sw = image.width;
+                    sh = image.height;
+                    dw = sw;
+                    dh = sh;
+                } else if (args.length === 5) {
+                    dx = args[1];
+                    dy = args[2];
+                    dw = args[3];
+                    dh = args[4];
+                    sw = image.width;
+                    sh = image.height;
+                } else if (args.length === 9) {
+                    sx = args[1];
+                    sy = args[2];
+                    sw = args[3];
+                    sh = args[4];
+                    dx = args[5];
+                    dy = args[6];
+                    dw = args[7];
+                    dh = args[8];
+                } else {
+                    throw new Error("Invalid number of arguments passed to drawImage: " + arguments.length);
+                }
+        
+                parent = this.__closestGroupOrSvg();
+                currentElement = this.__currentElement;
+                var translateDirective = "translate(" + dx + ", " + dy + ")";
+                if (image instanceof ctx) {
+                    //canvas2svg mock canvas context. In the future we may want to clone nodes instead.
+                    //also I'm currently ignoring dw, dh, sw, sh, sx, sy for a mock context.
+                    svg = image.getSvg().cloneNode(true);
+                    if (svg.childNodes && svg.childNodes.length > 1) {
+                        defs = svg.childNodes[0];
+                        while(defs.childNodes.length) {
+                            id = defs.childNodes[0].getAttribute("id");
+                            this.__ids[id] = id;
+                            this.__defs.appendChild(defs.childNodes[0]);
+                        }
+                        group = svg.childNodes[1];
+                        if (group) {
+                            //save original transform
+                            var originTransform = group.getAttribute("transform");
+                            var transformDirective;
+                            if (originTransform) {
+                                transformDirective = originTransform+" "+translateDirective;
+                            } else {
+                                transformDirective = translateDirective;
+                            }
+                            group.setAttribute("transform", transformDirective);
+                            parent.appendChild(group);
+                        }
+                    }
+                } else if (image.nodeName === "CANVAS" || image.nodeName === "IMG") {
+                    //canvas or image
+                    svgImage = this.__createElement("image");
+                    svgImage.setAttribute("width", dw);
+                    svgImage.setAttribute("height", dh);
+                    svgImage.setAttribute("preserveAspectRatio", "none");
+        
+                    if (sx || sy || sw !== image.width || sh !== image.height) {
+                        //crop the image using a temporary canvas
+                        canvas = this.__document.createElement("canvas");
+                        canvas.width = dw;
+                        canvas.height = dh;
+                        context = canvas.getContext("2d");
+                        context.drawImage(image, sx, sy, sw, sh, 0, 0, dw, dh);
+                        image = canvas;
+                    }
+                    svgImage.setAttribute("transform", translateDirective);
+                    svgImage.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href",
+                        image.nodeName === "CANVAS" ? image.toDataURL() : image.getAttribute("src"));
+                    parent.appendChild(svgImage);
+                }
+            };
+        
+            /**
+            * Generates a pattern tag
+            */
+            ctx.prototype.createPattern = function (image, repetition) {
+                var pattern = this.__document.createElementNS("http://www.w3.org/2000/svg", "pattern"), id = randomString(this.__ids),
+                    img;
+                pattern.setAttribute("id", id);
+                pattern.setAttribute("width", image.width);
+                pattern.setAttribute("height", image.height);
+                if (image.nodeName === "CANVAS" || image.nodeName === "IMG") {
+                    img = this.__document.createElementNS("http://www.w3.org/2000/svg", "image");
+                    img.setAttribute("width", image.width);
+                    img.setAttribute("height", image.height);
+                    img.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href",
+                        image.nodeName === "CANVAS" ? image.toDataURL() : image.getAttribute("src"));
+                    pattern.appendChild(img);
+                    this.__defs.appendChild(pattern);
+                } else if (image instanceof ctx) {
+                    pattern.appendChild(image.__root.childNodes[1]);
+                    this.__defs.appendChild(pattern);
+                }
+                return new CanvasPattern(pattern, this);
+            };
+        
+            ctx.prototype.setLineDash = function (dashArray) {
+                if (dashArray && dashArray.length > 0) {
+                    this.lineDash = dashArray.join(",");
+                } else {
+                    this.lineDash = null;
+                }
+            };
+        
+            /**
+            * Not yet implemented
+            */
+            ctx.prototype.drawFocusRing = function () {};
+            ctx.prototype.createImageData = function () {};
+            ctx.prototype.getImageData = function () {};
+            ctx.prototype.putImageData = function () {};
+            ctx.prototype.globalCompositeOperation = function () {};
+            ctx.prototype.setTransform = function () {};
+        
+            //add options for alternative namespace
+            if (typeof window === "object") {
+                window.C2S = ctx;
+            }
+        
+            // CommonJS/Browserify
+            if (typeof module === "object" && typeof module.exports === "object") {
+                module.exports = ctx;
+            }
+        
+        }());
+        //Début 1215 lignes plus haut-----------------------------------------------------------------------------------------
+    </script>
+
+
+
+    <script> // script qui gère le fonctionnement du menu
+        "use strict";
+
+        // initialisation \\
+
+        let mock;
+        let obj; // stock les requêtes querySelector
+        // les compteurs pour les boucles for() utilisées plus tard
+        let m;
+        let o;
+        let p;
+        let q;
+        let t;
+        let taille_limite = 150; // initialisation pour le premier passage au lancement du navigateur, devient dynamique après
+
+        // booléen pour suivre le Mode utilisé (Normal ou Développeur)
+        let mode_dev = document.querySelector("#bmode").innerHTML === "Passer en mode Normal" ? true : false;
+
+        // raccourcis pour accéder aux boutons du menu
+        const radio_direction=["#d1", "#d2", "#d3", "#d4", "#d5", "#d6", "#d7", "#d8"];
+        const radio_couleur = ["#c1", "#c2"];
+        const radio_forme = ["#t1", "#t2"];
+
+        /*
+            Dans cette partie je prépare les informations du message d'alerte pour le nombre de formes choisi.
+            Mon but est que ce message dynamique m'affiche à chaque changement de valeur la taille maximale
+            que peuvent avoir mes formes (en fonction du nombre de formes souhaité). Je n'ai pas trouvé de
+            façon de le recalculer à chaque changement comme vous le verrez plus bas pour le message d'alerte
+            en fonction de la taille. Donc à la place, au chargement de la page web, je calcule tous les
+            nombre maximum de formes en fonction de toutes les tailles possible, et je stock les résultats
+            dans 2 tableaux.
+            tab_val_nb contient une série de "nombre maximal de formes"
+            tab_val-taille contient une série de "taille maximale des formes"
+            Chaque indice de ces tableaux (0, 1, 2, 3...) associe un nombre maximum de forme avec la taille
+            maximum de celles-ci. Vous verrez plus bas comment j'exploite ces résultats.
+        */
+        obj = document.querySelector("#canvas_board");
+        let width_canvas = obj.width;
+        let height_canvas = obj.height;
+        let nb_max = width_canvas * height_canvas;
+        let taille_max=(width_canvas <= height_canvas ? width_canvas : height_canvas);
+        let tab_val_nb = [];
+        let val_nb_ligne = 0;
+        let val_nb_colonne = 0;
+        let val_nb = 0;
+        let tab_val_taille = [];
+
+        for(q=taille_max;q>=1;q-=1){
+            val_nb_ligne = Math.floor(height_canvas/q);
+            val_nb_colonne = Math.floor(width_canvas/q);
+            val_nb = val_nb_ligne * val_nb_colonne;
+            if(tab_val_nb.indexOf(val_nb)===-1){
+                tab_val_nb.push(val_nb);
+                tab_val_taille.push(q);
+            }
+        }
+
+        console.log(tab_val_nb, tab_val_taille);
+
+        // liste des évènements \\
+        // cette section contient les interactions du menu avec le reste du programme
+
+
+        // partie chargement état initial du menu
+
+        window.addEventListener("load", function() {
+            // on masque les parties du menu qui ne s'affichent que sous certaines conditions
+            document.querySelector(".cond_saisie_trois_couleurs").style.display = "none";
+            document.querySelector(".cond_saisie_manuel").style.display = "none";
+            document.querySelector(".cond_saisie_unique").style.display = "none";
+
+            if (mode_dev == false) {
+                document.querySelectorAll(".mode_dev").forEach((elm) => elm.style.display="none");
+                document.querySelectorAll(".non_mode_dev").forEach((elm) => elm.style.display="block");
+                document.querySelector("#nf").setAttribute("max", nb_max); // on enlèves la limite de formes générées en fonction de la taille
+            }
+
+            // récupère les infos du formulaire dans un tableau
+            let data = new FormData(document.querySelector("form"));
+            let output = [];
+            for (const entry of data) {
+                output.push(entry[1]);
+            };
+            event.preventDefault();
+            mock = new C2S(document.querySelector("#canvas_board").width,
+                document.querySelector("#canvas_board").height);
+            mock = main(output, mock); // on lance le main avec les infos du formulaire
+        });
+
+
+        // partie choix du mode de GEN-I
+
+        document.querySelector("#bmode").addEventListener("click", function(){
+            if(this.innerHTML === "Passer en mode Normal"){ // je passe en mode Normal
+                mode_dev = false; // gestion du booléen
+                document.querySelector("#nf").setAttribute("max", nb_max); // on enlèves la limite de formes générées en fonction de la taille
+                document.querySelectorAll(".mode_dev").forEach((elm) => elm.style.display="none"); // efface les menus du mode Développeur
+                document.querySelectorAll(".non_mode_dev").forEach((elm) => elm.style.display="block"); // un retour à la ligne, pour de la présentation
+                this.innerHTML = "Passer en mode Développeur"; // changer le texte du bouton
+
+            }else{ // je passe en mode Développeur
+                mode_dev = true; // gestion du booléen
+                document.querySelector("#tai").value = taille_limite === -1 ? taille_max : taille_limite; // mets à jour la valeur de taille max
+                const event = new Event("change");
+                document.querySelector("#tai").dispatchEvent(event); // on met à jour les messages d'alerte
+                document.querySelectorAll(".mode_dev").forEach((elm) => elm.style.display="block"); // affiche les menus du mode Développeur
+                document.querySelectorAll(".non_mode_dev").forEach((elm) => elm.style.display="none"); // un retour à la ligne, pour de la présentation
+                this.innerHTML = "Passer en mode Normal"; // changer le texte du bouton
+            }
+        });
+
+
+        // partie taille du canvas
+
+        document.querySelector("#ht").addEventListener("change", function(){
+            // correction des valeurs saisies en dehors des valeurs min et max
+            obj = document.querySelector("#ht");
+            if(obj.value == null || obj.value == "" || obj.value < 250){
+                obj.value = 250;
+            }else if(obj.value > 1080){
+                obj.value = 1080;
+            }
+        });
+
+        document.querySelector("#wh").addEventListener("change", function(){
+            // correction des valeurs saisies en dehors des valeurs min et max
+            obj = document.querySelector("#wh");
+            if(obj.value == null || obj.value == "" || obj.value < 250){
+                obj.value = 250;
+            }else if(obj.value > 1920){
+                obj.value = 1920;
+            }
+        });
+
+        document.querySelector("#btai").addEventListener("click", function(){
+            // comme on a changé la taille de la page, on doit recalculer les tableau de nombres de formes et de tailles max
+            let nouv_hauteur = document.querySelector("#ht").value;
+            let nouv_largeur = document.querySelector("#wh").value;
+
+            obj = document.querySelector("#canvas_board");
+            obj.setAttribute("width", nouv_largeur);
+            obj.setAttribute("height", nouv_hauteur);
+
+            width_canvas = obj.width;
+            height_canvas = obj.height;
+            nb_max = width_canvas * height_canvas;
+            taille_max = (width_canvas <= height_canvas ? width_canvas : height_canvas);
+            tab_val_nb = [];
+            val_nb_ligne = 0;
+            val_nb_colonne = 0;
+            val_nb = 0;
+            tab_val_taille = [];
+
+            for(t=taille_max;t>=1;t-=1){
+                val_nb_ligne = Math.floor(height_canvas/t);
+                val_nb_colonne = Math.floor(width_canvas/t);
+                val_nb = val_nb_ligne * val_nb_colonne;
+                if(tab_val_nb.indexOf(val_nb)===-1){
+                    tab_val_nb.push(val_nb);
+                    tab_val_taille.push(t);
+                }
+            }
+
+            console.log(tab_val_nb, tab_val_taille);
+
+            // on force la mise à jour des messages d'alerte
+            const event = new Event("change");
+            document.querySelector("#nf").dispatchEvent(event);
+            document.querySelector("#tai").dispatchEvent(event);
+        });
+
+
+        // partie nombre et taille des formes générées
+
+        document.querySelector("#nf").addEventListener("change", function(){
+            taille_limite = -1;
+
+            // correction des valeurs saisies en dehors des valeurs min et max
+            obj = document.querySelector("#nf");
+            if(obj.value == null || obj.value == "" || obj.value == 0){
+                obj.value = 1;
+            }else if(obj.value > nb_max){
+                obj.value = nb_max;
+            }
+            let r = parseInt(this.value, 10); // on récupère la valeur saisie par l'utilisateur
+
+            // on cherche la valeur saisie dans le tableau des "nombres de formes max"
+            if(tab_val_nb.indexOf(r) !== -1){
+                // si on la trouve, on récupère la valeur correspondant à cette même case dans le tableau des "tailles max"
+                taille_limite = tab_val_taille[tab_val_nb.indexOf(r)];
+            }else{
+                // sinon on incrémente la saisie jusqu'à trouver la valeur superieure la plus proche
+                do{
+                    r += 1;
+                }while(tab_val_nb.indexOf(r) === -1);
+                taille_limite = tab_val_taille[tab_val_nb.indexOf(r)];
+            }
+
+            // on adapte le message d'alerte pour indiquer la taille max en fonction du nombre de formes choisies
+            document.querySelector("#msg_forme").innerHTML = "Vous souhaitez afficher "
+                + this.value + " formes. Leur taille maximale est de " + taille_limite + ".";
+
+            // on adapte la valeur max de la taille en fonction du nombre de formes
+            document.querySelector("#tai").setAttribute("max", taille_limite === -1 ? taille_max : taille_limite);
+        });
+
+        document.querySelector("#tai").addEventListener("change", function(){
+            /*
+                correction des valeurs saisies en dehors de la valeur min
+                on ne corrige pas la valeur max car la dépasser permet d'obtenir de jolis résultats
+            */
+            obj = document.querySelector("#tai");
+            if(obj.value == null || obj.value == "" || obj.value == 0){
+                obj.value = 1;
+            }
+            let taille_bloc = this.value; // on récupère la valeur saisie par l'utilisateur
+
+            /*
+                J'aurais pû exploiter mes tableaux de nombre et tailles max ici, comme pour l'évènement au-dessus.
+                Mais j'obtient le même résultat en seulement 3 lignes (simplement en refaisant le calcul de base).
+            */
+            let nb_ligne = Math.floor(height_canvas/taille_bloc);
+            let nb_colonne = Math.floor(width_canvas/taille_bloc);
+            let res = nb_colonne * nb_ligne;
+
+            // on adapte le message d'alerte pour indiquer le nombre max de formes en fonction de la taille choisie
+            document.querySelector("#msg_taille").innerHTML = "Vous avez sélectionné une taille de "
+                + this.value + ". Le nombre maximal de formes générées est de " + res + ".";
+
+            // on adapte la valeur max du nombre de formes en fonction de la taille
+            document.querySelector("#nf").setAttribute("max", res);
+        });
+
+
+        // partie types de formes générénées - gestion de l'affichage du menu
+
+        for(p=0;p<radio_forme.length;p+=1){
+            document.querySelector(radio_forme[p]).addEventListener("click", function(){
+                obj = document.querySelector(".cond_saisie_unique");
+                if(obj.style.display == "" || obj.style.display == "block"){
+                    obj.style.display = "none";
+                }
+            });
+        }
+
+        document.querySelector("#t3").addEventListener("click", function(){
+            obj = document.querySelector(".cond_saisie_unique");
+            if(obj.style.display == "" || obj.style.display == "none"){
+                obj.style.display = "block";
+            }
+        });
+
+
+        // partie choix 2 ou 3 couleurs - gestion de l'affichage du menu
+
+        document.querySelector("#deux").addEventListener("click", function(){
+            obj = document.querySelector(".cond_saisie_trois_couleurs");
+            if(obj.style.display == "" || obj.style.display == "block"){
+                obj.style.display = "none";
+            }
+        });
+
+        document.querySelector("#trois").addEventListener("click", function(){
+            obj = document.querySelector(".cond_saisie_trois_couleurs");
+            if(obj.style.display == "" || obj.style.display == "none"){
+                obj.style.display = "block";
+            }
+        });
+
+
+        // partie choix des couleurs - gestion de l'affichage du menu
+
+        for(m=0;m<radio_couleur.length;m+=1){
+            document.querySelector(radio_couleur[m]).addEventListener("click",
+            function(){
+                obj = document.querySelector(".cond_saisie_manuel");
+                if(obj.style.display == "" || obj.style.display == "block"){
+                    obj.style.display = "none";
+                }
+                obj = document.querySelector(".cond_saisie_non_manuel");
+                if(obj.style.display == "" || obj.style.display == "none"){
+                    obj.style.display = "block";
+                }
+            });
+        }
+
+        document.querySelector("#c3").addEventListener("click", function(){
+            obj = document.querySelector(".cond_saisie_manuel");
+            if(obj.style.display == "" || obj.style.display == "none"){
+                obj.style.display = "block";
+            }
+            obj = document.querySelector(".cond_saisie_non_manuel");
+            if(obj.style.display == "" || obj.style.display == "block"){
+                obj.style.display = "none";
+            }
+        });
+
+
+        // partie sens du gradient - gestion de l'affichage du menu
+
+        for(o=0;o<radio_direction.length;o+=1){
+            document.querySelector(radio_direction[o]).addEventListener("click",
+            function(){
+                obj = document.querySelector(".cond_saisie_alea");
+                if(obj.style.display == "" || obj.style.display == "block"){
+                    obj.style.display = "none";
+                }
+            });
+        }
+
+        document.querySelector("#d9").addEventListener("click", function(){
+            obj = document.querySelector(".cond_saisie_alea");
+            if(obj.style.display == "" || obj.style.display == "none"){
+                obj.style.display = "block";
+            }
+        });
+
+
+
+        // partie bouttons
+
+        document.querySelector("#b1").addEventListener("click", function(){ // bouton "Générer"
+            // en mode Normal, la taille des formes est toujours la plus grande possible
+            if(!mode_dev){
+                document.querySelector("#tai").value = taille_limite === -1 ? taille_max : taille_limite;
+            }
+
+            // création d'une nouvelle page
+            let new_canvas = document.querySelector("#canvas_board");
+            let ctxt = new_canvas.getContext("2d");
+            ctxt.clearRect(0,0,new_canvas.width,new_canvas.height);
+
+            // récupère les infos du formulaire dans un tableau
+            let data = new FormData(document.querySelector("form"));
+            let output = [];
+            for (const entry of data) {
+                output.push(entry[1]);
+            };
+            event.preventDefault();
+
+            // correction d'un bug
+            if(output[7] === "manuel"){
+                output[11] = "true";
+            }
+
+            // on lance le main avec les infos du formulaire
+            mock = new C2S(document.querySelector("#canvas_board").width,
+                document.querySelector("#canvas_board").height);
+            mock = main(output, mock);
+        });
+
+        document.querySelector("#b2").addEventListener("click", function(){ // bouton "Générer par dessus"
+            // en mode Normal, la taille des formes est toujours la plus grande possible
+            if(!mode_dev){
+                document.querySelector("#tai").value = taille_limite === -1 ? taille_max : taille_limite;
+            }
+
+            // récupère les infos du formulaire dans un tableau
+            let data = new FormData(document.querySelector("form"));
+            let output = [];
+            for (const entry of data) {
+                output.push(entry[1]);
+            };
+            event.preventDefault();
+
+            // correction d'un bug
+            if(output[7] === "manuel"){
+                output[11] = "true";
+            }
+
+            // on lance le main avec les infos du formulaire
+            mock = main(output, mock);
+        });
+
+        document.querySelector("#b3").addEventListener("click", function(){ // bouton "Enregistrer en .png"
+            // sauvegarde le Canvas en png
+            obj = document.querySelector("#canvas_board")
+            obj.toBlob(function(blob) {
+                saveAs(blob, "pretty_image_" + Date.now() + ".png");
+            });
+        });
+
+        document.querySelector("#b4").addEventListener("click", function(){ // bouton "Enregistrer en .svg"
+            // convert to a valid XML source
+            const as_text = mock.getSerializedSvg();
+            // store in a Blob
+            const blob = new Blob([as_text], { type: "image/svg+xml" });
+            // create an URI pointing to that blob
+            const url = URL.createObjectURL(blob);
+
+            obj = document.querySelector(".retour_svg");
+            let nom = "pretty_image_" + Date.now();
+            obj.innerHTML = '<a href ="' + url + '" download="' + nom + '" class="click_a">Votre image ici ! </a>';
+            document.querySelector(".click_a").click();
+        });
+    </script>
+
+
+
+    <script> // script qui gère le fonctionnement du canvas
+        "use strict";
+
+        // générateurs de nombres aléatoires
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max); // retourne un nombre aléatoire entre 0 et max-1
+        }
+
+        function attribution_alea(){
+            let nb_utilises = [];
+            let nb;
+            do{
+                nb = getRandomInt(3);
+                if(nb_utilises.indexOf(nb)===-1){
+                    nb_utilises.push(nb);
+                }
+            }while(nb_utilises.length < 3);
+            return nb_utilises; // retourne un tableau contenant les valeurs 0, 1 et 2 dans un ordre aléatoire
+        }
+
+
+        // générateur de sens du gradient
+        function sens_gradient(a, b, direction_gradient){
+            // liste des coordonnées xy dans l'ordre du switch ci-dessous
+            const liste_direction = [[a/2,b,a/2,0], [0,b,a,0], [0,b/2,a,b/2],
+                [0,0,a,b], [a/2,0,a/2,b], [a,0,0,b], [a,b/2,0,b/2], [a,b,0,0]];
+            let res;
+            switch(direction_gradient){
+                case "top": res = liste_direction[0]; break; // [a/2,b,a/2,0]
+                case "right top": res = liste_direction[1]; break;
+                case "right": res = liste_direction[2]; break;
+                case "right bottom": res = liste_direction[3]; break;
+                case "bottom": res = liste_direction[4]; break;
+                case "left bottom": res = liste_direction[5]; break;
+                case "left": res = liste_direction[6]; break;
+                case "left top": res = liste_direction[7]; break; // [a,b,0,0]
+                default: res = liste_direction[getRandomInt(liste_direction.length)];
+            }
+            return res; // retourne un tableau contenant les coordonnée xy des points de départ et d'arrivée du gradient
+        }
+
+
+        // générateur d'échelle de couleur
+        function echelle_couleur_gradient(nb_etapes, couleur_debut, couleur_fin,
+        echelle_couleur){
+            /*
+                Remarquez que le nombre d'étape est un paramètre d'entrée.
+                Si vous voulez une échelle plus développée vous pouvez changer ce paramètre plus bas (au moment de l'appel de la fonction).
+            */
+            let x = Math.floor((couleur_fin[0] - couleur_debut[0]) / nb_etapes);
+            let y = Math.floor((couleur_fin[1] - couleur_debut[1]) / nb_etapes);
+            let z = Math.floor((couleur_fin[2] - couleur_debut[2]) / nb_etapes);
+            let s;
+
+            for(s=1;s<nb_etapes;s+=1){
+                let couleur_s = [(couleur_debut[0] + x*s), (couleur_debut[1] + y*s),
+                    (couleur_debut[2] + z*s)];
+                echelle_couleur.push("rgb(" + couleur_s + ")");
+            }
+            echelle_couleur.push("rgb(" + couleur_fin + ")");
+            return echelle_couleur; // renvoie un tableau de chaînes de caractères, chacune décrivant une couleur en rgb
+        }
+
+
+        // générateur de couleur de gradient
+        function couleur_du_gradient(parametres){
+            let liste_couleur = []; // stock les valeurs rgb au fur et à mesure
+            let nb_utilises; // utilisé pour les couleurs primaires, plus bas
+
+            // initialisation couleurs
+            let couleur_debut = [0, 0, 0]; // couleur du début du gradient (2 et 3 couleurs)
+            let couleur_fin = [0, 0, 0]; // couleur de fin si 2 couleurs OU du milieu si 3 couleurs
+            let couleur_trois = [0, 0, 0]; // couleur de fin si 3 couleurs
+            const couleurs_primaires = [[255, 0, 0], [255, 237, 0], [0, 0, 255]]; // rouge, jaune, bleu
+
+            switch(parametres[7]){
+                case "manuel":
+                    // on récupère juste les valeurs du formulaire
+                    couleur_debut = parametres[8];
+                    couleur_fin = parametres[9];
+                    couleur_trois = parametres[10];
+                    break;
+                case "primaires":
+                    /*
+                        Dans cette partie on appelle attribution_alea() pour obtenir un tablea contenant 0, 1 et 2 dans un ordre aléatoire.
+                        On se sert ensuite de ces nombres commes index pour récupérer les valeurs du tableau couleurs_primaires.
+                        Le résultat est nos trois couleurs dans un ordre aléatoire parmi 6 combinaisons, ce qui nous permet d'avoir des
+                        gradients aléatoires avec 2 et 3 couleurs (3 variations pour chaque).
+                    */
+                    nb_utilises = attribution_alea();
+                    couleur_debut = couleurs_primaires[nb_utilises[0]];
+                    couleur_fin = couleurs_primaires[nb_utilises[1]];
+                    couleur_trois = couleurs_primaires[nb_utilises[2]];
+                    break;
+                default:
+                    // attribution aléatoire des couleurs
+                    couleur_debut = [getRandomInt(256), getRandomInt(256),
+                        getRandomInt(256)];
+                    couleur_fin = [getRandomInt(256), getRandomInt(256),
+                        getRandomInt(256)];
+                    if(parametres[6]){
+                        couleur_trois = [getRandomInt(256), getRandomInt(256),
+                            getRandomInt(256)];
+                    }
+            }
+
+            liste_couleur.push("rgb(" + couleur_debut + ")"); // initialise l'échelle de couleurs
+
+            // nombre d'étapes de l'échelle de couleur du gradient (géré en fonction de la taille des formes)
+            let nb_echelle_trois;
+            if(parametres[3] > 10){
+                nb_echelle_trois = 1;
+            }else if(parametres[3] > 50){
+                nb_echelle_trois = 2;
+            }else if(parametres[3] > 150){
+                nb_echelle_trois = 5;
+            }else if(parametres[3] > 300){
+                nb_echelle_trois = 8;
+            }else{
+                nb_echelle_trois = 10;
+            }
+            let nb_echelle_deux = nb_echelle_trois * 2;
+            if((parametres[12] !== "random" || parametres[13]) && parametres[7]){
+                // augmente la qualité du gradient s'il s'agit d'un gradient uni
+                nb_echelle_deux += nb_echelle_deux;
+                nb_echelle_trois += nb_echelle_trois;
+            }
+
+            // complète l'échelle de couleurs
+            if(parametres[6]){ // cas gradient en 3 couleurs
+                liste_couleur = echelle_couleur_gradient(nb_echelle_trois,
+                    couleur_debut, couleur_fin, liste_couleur);
+                liste_couleur = echelle_couleur_gradient(nb_echelle_trois,
+                    couleur_fin, couleur_trois, liste_couleur);
+            }else{ // cas gradient en 2 couleurs
+                liste_couleur = echelle_couleur_gradient(nb_echelle_deux,
+                    couleur_debut, couleur_fin, liste_couleur);
+            }
+
+            return liste_couleur; // renvoie un tableau dont chaque case contient une chaîne de caractères décrivant une couleur en rgb
+        }
+
+
+        // convertisseur d'infos en variables
+        function verif_parametres(parametres){
+            let R;
+            let G;
+            let B;
+            let n;
+
+            // récupère les informations du formulaire
+            for(n=0;n<parametres.length;n+=1){
+                switch(n){
+                    case 0:
+                    case 1:
+                    case 2:
+                    case 3: // cas entier :
+                        parametres[n] = parseInt(parametres[n], 10);
+                        break;
+                    case 8:
+                    case 9:
+                    case 10: // cas tableau d'entiers :
+                        R = parseInt(parametres[n].slice(1,3), 16);
+                        G = parseInt(parametres[n].slice(3,5), 16);
+                        B = parseInt(parametres[n].slice(5), 16);
+                        parametres[n] = [R, G, B];
+                        break;
+                    case 6:
+                    case 11:
+                    case 13: // cas booleen :
+                        if(parametres[n] === "true"){
+                            parametres[n] = true;
+                        }else{
+                            parametres[n] = false;
+                        }
+                        break;
+                    default: // cas chaine :
+                        parametres[n] = parametres[n];
+                }
+            }
+            return parametres; // retourne un tableau de variables utilisables
+        }
+
+
+        // générateur de formes
+        function dessin_canvas(context, num_forme, x, y, taille_bloc){
+            // la valeur de num_forme, passée en paramètres, détermine la forme tracée
+            switch(num_forme){
+                case 0: // cercle
+                    context.beginPath();
+                    context.arc(taille_bloc/2 + x, taille_bloc/2 + y,
+                        taille_bloc/2, 0, 2*Math.PI, false);
+                    context.closePath();
+                    break;
+                case 1: // triangle
+                    context.beginPath();
+                    context.moveTo(0 + x, taille_bloc + y);
+                    context.lineTo(taille_bloc/2 + x, 0 + y);
+                    context.lineTo(taille_bloc + x, taille_bloc + y);
+                    context.closePath();
+                    break;
+                case 2: // carre
+                    context.beginPath();
+                    context.moveTo(0 + x, 0 + y);
+                    context.lineTo(taille_bloc + x, 0 + y);
+                    context.lineTo(taille_bloc + x, taille_bloc + y);
+                    context.lineTo(0 + x, taille_bloc + y);
+                    context.closePath();
+                    break;
+                default: console.log("Erreur forme");
+            }
+        }
+
+
+
+        function main(parametres, mockContext){
+
+            parametres = verif_parametres(parametres); // conversion du formulaire en variables
+
+            // création d'un calque
+            let canvasElement = document.querySelector("#canvas_board");
+            let context = canvasElement.getContext("2d");
+
+            // initialisation des variables
+            let degrade; // contient le dégradé
+            let degrade2;
+            let direction; // direction du gradient
+            let couleur; // couleur du gradient
+            let x = 0; // coordonnée x du programme
+            let y = 0; // coordonnée y du programme
+            let taille_bloc = parametres[3]; // taille des formes
+            let mem_direction; // sauvegarde de la 1ère direction générée
+            let mem_couleur; // sauvegarde de la 1ère couleur générée
+            let etapes; // contient le nombre d'échelons de couleur du gradient
+            let liste_formes = ["cercle", "triangle", "carre"];
+            let ordre_formes = []; // même utilité que nb_utilises pour l'attribution des couleurs primaires
+            let num; // contient un numéro généré aléatoirement pour servir d'index à liste_formes
+            // les compteurs pour les boucles for() utilisées plus tard
+            let j;
+            let k;
+            let l;
+
+
+            /*
+                Cette partie compte le nombre de cases générées par le programme. Elle me permet 2 choses :
+                - M'assurer que le nombre de formes demandé par l'utilisateur tiendra bien sur la page (et
+                    arrêter le Main() avant sinon).
+                - Connaître la taille qu'occupera l'ensemble des formes. Dans le cas où j'utilise un gradient
+                    uni, cette taille me permet d'avoir des dimensions différentes de celles de la page
+                    entière, ce qui évite qu'une partie du gradient soit perdue si le dessin n'exploite pas
+                    toute la surface de la page.
+            */
+            let wh_canvas = document.querySelector("#canvas_board").width;
+            let ht_canvas = document.querySelector("#canvas_board").height;
+
+            let wh_gradient = 0;
+            let ht_gradient = 0;
+            let nb_bloc = 0;
+            let nb_ligne = 0;
+            let nb_colonne = Math.floor(wh_canvas/taille_bloc);
+
+            do{
+                nb_bloc += nb_colonne;
+                nb_ligne += 1;
+            }while(nb_bloc < parametres[2] && ((nb_ligne*taille_bloc + taille_bloc) <= ht_canvas));
+
+            wh_gradient = nb_colonne * taille_bloc;
+            ht_gradient = nb_ligne * taille_bloc;
+
+
+            /*
+                Cette partie crée le sens et la couleur du PREMIER gradient et vérifie
+                si le Canvas devra suivre un gradient uni.
+            */
+            direction = sens_gradient(wh_gradient, ht_gradient, parametres[12]); // génération de la direction
+            couleur = couleur_du_gradient(parametres); // génération de la couleur
+
+            if((parametres[12] !== "random" || parametres[13]) && parametres[11]){ // cas gradient uni
+                // application des couleurs au gradient
+                degrade = context.createLinearGradient(direction[0], direction[1],
+                    direction[2], direction[3]);
+                degrade2 = mockContext.createLinearGradient(direction[0], direction[1],
+                    direction[2], direction[3]);
+                etapes = couleur.length - 1;
+                for(j=0;j<=etapes;j+=1){
+                    degrade.addColorStop(j/etapes, couleur[j]);
+                    degrade2.addColorStop(j/etapes, couleur[j]);
+                }
+
+                context.fillStyle = degrade; // les formes auront la couleur du gradient uni
+                mockContext.fillStyle = degrade2;
+            }else{ // cas normal
+                // on stock les valeurs générées pour les cas où les paramètres suivants sont selectionnés :
+                mem_direction = sens_gradient(taille_bloc, taille_bloc, parametres[12]); // sens du gradient appliqué sur tout le calque
+                mem_couleur = couleur; // couleur du gradient appliquée sur tout le calque
+            }
+
+
+            // boucle de création de chaque forme
+            for(k=0;k<parametres[2];k+=1){
+
+
+                // cas gradient non uni
+                if(!((parametres[12] !== "random" || parametres[13]) && parametres[11])){
+
+                    if(parametres[12] !== "random" || parametres[13]){ // cas sens appliqué sur tout le calque
+                        direction = mem_direction;
+                    }else{ // cas autre
+                        direction = sens_gradient(taille_bloc, taille_bloc, parametres[12]);
+                    }
+                    if(parametres[11]){ // cas couleur appliquée sur tout le calque
+                        couleur = mem_couleur;
+                    }else{ // cas autre
+                        couleur = couleur_du_gradient(parametres);
+                    }
+
+                    // application des couleurs au gradient
+                    degrade = context.createLinearGradient(direction[0] + x,
+                        direction[1] + y, direction[2] + x, direction[3] + y);
+                    degrade2 = mockContext.createLinearGradient(direction[0] + x,
+                        direction[1] + y, direction[2] + x, direction[3] + y);
+                    etapes = couleur.length - 1;
+                    for(l=0;l<=etapes;l+=1){
+                        degrade.addColorStop(l/etapes, couleur[l]);
+                        degrade2.addColorStop(l/etapes, couleur[l]);
+                    }
+                    context.fillStyle = degrade; // la forme générée dans cette itération aura la couleur de ce gradient
+                    mockContext.fillStyle = degrade2;
+                }
+
+
+                // cette partie gère le tracé de la forme
+                switch(parametres[4]){
+                    case "regulier":
+                        if(ordre_formes.length === 0){ // on maintient un tableau contenant 0, 1 et 2 dans un odre aléatoire
+                            ordre_formes = attribution_alea();
+                        }
+                        dessin_canvas(context, ordre_formes[0], x, y, parametres[3]); // on s'en sert pour déterminer l'ordre des formes
+                        dessin_canvas(mockContext,ordre_formes[0],x,y,parametres[3]);
+                        ordre_formes.splice(0,1);
+                        break;
+                    case "unique":
+                        dessin_canvas(context, liste_formes.indexOf(parametres[5]),
+                            x, y, parametres[3]); // parametres[5] indique si on dessine des cercles, triangles ou carrés
+                        dessin_canvas(mockContext,liste_formes.indexOf(parametres[5]),
+                            x, y, parametres[3]);
+                        break;
+                    default:
+                        num = getRandomInt(3);
+                        dessin_canvas(context, num, x, y, parametres[3]); // on dessine un forme aléatoire
+                        dessin_canvas(mockContext, num, x, y, parametres[3]);
+                }
+
+
+                // on applique la couleur du gradient selectionné (avec la commande context.fillStyle) à la forme générée
+                context.fill();
+                mockContext.fill();
+
+
+                // on gère la position du programme (utilisée pour le sens des gradients et le tracé des formes)
+                x += taille_bloc; // x passe à la case suivante
+                if((x+taille_bloc) > wh_canvas){ // Si on atteint le bord du Canvas...
+                    x = 0; // ... x revient à la gauche de la page...
+                    y += taille_bloc; // ... et y passe à la ligne suivante.
+                    if((y+taille_bloc) > ht_canvas){
+                        break; // si on essaye de tracer plus de formes que ce que la page peut contenir, on arrête le programme en avance
+                    }
+                }
+            }
+
+            return mockContext;
+        }
+    </script>
+
+
+
+    <script> // script qui gère la sauvegarde du canvas en png
+        //librairie trouvée sur GitHub : https://github.com/eligrey/FileSaver.js
+        //Fin dans 171 lignes-----------------------------------------------------------------------------------------
+        /*
+        * FileSaver.js
+        * A saveAs() FileSaver implementation.
+        *
+        * By Eli Grey, http://eligrey.com
+        *
+        * License : https://github.com/eligrey/FileSaver.js/blob/master/LICENSE.md (MIT)
+        * source  : http://purl.eligrey.com/github/FileSaver.js
+        */
+
+        // The one and only way of getting global scope in all environments
+        // https://stackoverflow.com/q/3277182/1008999
+        var _global = typeof window === 'object' && window.window === window
+        ? window : typeof self === 'object' && self.self === self
+        ? self : typeof global === 'object' && global.global === global
+        ? global
+        : this
+
+        function bom (blob, opts) {
+        if (typeof opts === 'undefined') {opts = { autoBom: false };}
+        else if (typeof opts !== 'object') {
+        console.warn('Deprecated: Expected third argument to be a object')
+        opts = { autoBom: !opts }
+        }
+
+        // prepend BOM for UTF-8 XML and text/ types (including HTML)
+        // note: your browser will automatically convert UTF-16 U+FEFF to EF BB BF
+        if (opts.autoBom && /^\s*(?:text\/\S*|application\/xml|\S*\/\S*\+xml)\s*;.*charset\s*=\s*utf-8/i.test(blob.type)) {
+        return new Blob([String.fromCharCode(0xFEFF), blob], { type: blob.type });
+        }
+        return blob;
+        }
+
+        function download (url, name, opts) {
+        var xhr = new XMLHttpRequest()
+        xhr.open('GET', url)
+        xhr.responseType = 'blob'
+        xhr.onload = function () {
+        saveAs(xhr.response, name, opts)
+        }
+        xhr.onerror = function () {
+        console.error('could not download file')
+        }
+        xhr.send()
+        }
+
+        function corsEnabled (url) {
+        var xhr = new XMLHttpRequest()
+        // use sync to avoid popup blocker
+        xhr.open('HEAD', url, false)
+        try {
+        xhr.send()
+        } catch (e) {}
+        return xhr.status >= 200 && xhr.status <= 299;
+        }
+
+        // `a.click()` doesn't work for all browsers (#465)
+        function click (node) {
+        try {
+        node.dispatchEvent(new MouseEvent('click'))
+        } catch (e) {
+        var evt = document.createEvent('MouseEvents')
+        evt.initMouseEvent('click', true, true, window, 0, 0, 0, 80,
+                                20, false, false, false, false, 0, null)
+        node.dispatchEvent(evt)
+        }
+        }
+
+        // Detect WebView inside a native macOS app by ruling out all browsers
+        // We just need to check for 'Safari' because all other browsers (besides Firefox) include that too
+        // https://www.whatismybrowser.com/guides/the-latest-user-agent/macos
+        var isMacOSWebView = _global.navigator && /Macintosh/.test(navigator.userAgent) && /AppleWebKit/.test(navigator.userAgent) && !/Safari/.test(navigator.userAgent)
+
+        var saveAs = _global.saveAs || (
+        // probably in some web worker
+        (typeof window !== 'object' || window !== _global)
+        ? function saveAs () { /* noop */ }
+
+        // Use download attribute first if possible (#193 Lumia mobile) unless this is a macOS WebView
+        : ('download' in HTMLAnchorElement.prototype && !isMacOSWebView)
+        ? function saveAs (blob, name, opts) {
+        var URL = _global.URL || _global.webkitURL
+        // Namespace is used to prevent conflict w/ Chrome Poper Blocker extension (Issue #561)
+        var a = document.createElementNS('http://www.w3.org/1999/xhtml', 'a')
+        name = name || blob.name || 'download'
+
+        a.download = name
+        a.rel = 'noopener' // tabnabbing
+
+        // TODO: detect chrome extensions & packaged apps
+        // a.target = '_blank'
+
+        if (typeof blob === 'string') {
+            // Support regular links
+            a.href = blob
+            if (a.origin !== location.origin) {
+            corsEnabled(a.href)
+                ? download(blob, name, opts)
+                : click(a, a.target = '_blank')
+            } else {
+            click(a)
+            }
+        } else {
+            // Support blobs
+            a.href = URL.createObjectURL(blob)
+            setTimeout(function () { URL.revokeObjectURL(a.href) }, 4E4) // 40s
+            setTimeout(function () { click(a) }, 0)
+        }
+        }
+
+        // Use msSaveOrOpenBlob as a second approach
+        : 'msSaveOrOpenBlob' in navigator
+        ? function saveAs (blob, name, opts) {
+        name = name || blob.name || 'download'
+
+        if (typeof blob === 'string') {
+            if (corsEnabled(blob)) {
+            download(blob, name, opts)
+            } else {
+            var a = document.createElement('a')
+            a.href = blob
+            a.target = '_blank'
+            setTimeout(function () { click(a) })
+            }
+        } else {
+            navigator.msSaveOrOpenBlob(bom(blob, opts), name)
+        }
+        }
+
+        // Fallback to using FileReader and a popup
+        : function saveAs (blob, name, opts, popup) {
+        // Open a popup immediately do go around popup blocker
+        // Mostly only available on user interaction and the fileReader is async so...
+        popup = popup || open('', '_blank')
+        if (popup) {
+            popup.document.title =
+            popup.document.body.innerText = 'downloading...'
+        }
+
+        if (typeof blob === 'string') {return download(blob, name, opts);}
+
+        var force = blob.type === 'application/octet-stream'
+        var isSafari = /constructor/i.test(_global.HTMLElement) || _global.safari
+        var isChromeIOS = /CriOS\/[\d]+/.test(navigator.userAgent)
+
+        if ((isChromeIOS || (force && isSafari) || isMacOSWebView) && typeof FileReader !== 'undefined') {
+            // Safari doesn't allow downloading of blob URLs
+            var reader = new FileReader()
+            reader.onloadend = function () {
+            var url = reader.result
+            url = isChromeIOS ? url : url.replace(/^data:[^;]*;/, 'data:attachment/file;')
+            if (popup) {popup.location.href = url;}
+            else {location = url;}
+            popup = null // reverse-tabnabbing #460
+            }
+            reader.readAsDataURL(blob)
+        } else {
+            var URL = _global.URL || _global.webkitURL
+            var url = URL.createObjectURL(blob)
+            if (popup) {popup.location = url;}
+            else {location.href = url;}
+            popup = null // reverse-tabnabbing #460
+            setTimeout(function () { URL.revokeObjectURL(url) }, 4E4) // 40s
+        }
+        }
+        )
+
+        _global.saveAs = saveAs.saveAs = saveAs
+
+        if (typeof module !== 'undefined') {
+        module.exports = saveAs;
+        }
+        //Début 171 lignes plus haut-----------------------------------------------------------------------------------------
+    </script>
+
+</body>
+</html>
